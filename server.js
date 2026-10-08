@@ -8,10 +8,10 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 
-// public klasöründeki statik dosyaları (index.html, sw.js) dışarı sunar
+// public klasöründeki index.html ve statik dosyaları sunar
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Proxy endpoint'i
+// Proxy Endpoint
 app.use('/proxy', (req, res, next) => {
   const targetUrl = req.query.url;
   if (!targetUrl) return res.status(400).send('URL parametresi eksik.');
@@ -20,16 +20,23 @@ app.use('/proxy', (req, res, next) => {
     target: targetUrl,
     changeOrigin: true,
     followRedirects: true,
-    pathRewrite: () => '',
+    pathRewrite: (path, req) => '',
     onProxyReq: (proxyReq) => {
-      // Tarayıcı başlıklarını taklit eder
+      // Masaüstü Chrome başlıkları enjekte edilir
       proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      proxyReq.setHeader('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8');
     },
     onProxyRes: (proxyRes) => {
-      // iframe engellerini ve CSP kısıtlamalarını temizler
+      // Güvenlik başlıkları temizlenir
       delete proxyRes.headers['x-frame-options'];
       delete proxyRes.headers['content-security-policy'];
+      delete proxyRes.headers['content-security-policy-report-only'];
       proxyRes.headers['access-control-allow-origin'] = '*';
+    },
+    onError: (err, req, res) => {
+      // Sunucunun çökmesini (502 vermesini) engeller
+      console.error('Proxy Hatası:', err);
+      res.status(500).send('Hedef siteye bağlanırken bir hata oluştu.');
     }
   })(req, res, next);
 });
